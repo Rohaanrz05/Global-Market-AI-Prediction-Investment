@@ -209,7 +209,7 @@ p, label, span {
 
 def load_default_csv():
     possible_files = [
-        "clean_global_market_ai_dataset_for_ml.csv",
+        "clean_global_market_ai_dataset_for_ml.csv.gz",
         "global_market_ai_dataset.csv",
         "global_market_ai_dataset(3).csv",
         "/content/clean_global_market_ai_dataset_for_ml.csv",
