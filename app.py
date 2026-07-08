@@ -207,8 +207,11 @@ p, label, span {
 # DATA LOADING
 # =========================================================
 
+@st.cache_data
 def load_default_csv():
+    # Prioritizing compressed_data.csv.gz at the top of the stack
     possible_files = [
+        "compressed_data.csv.gz",
         "clean_global_market_ai_dataset_for_ml.csv.gz",
         "global_market_ai_dataset.csv",
         "global_market_ai_dataset(3).csv",
@@ -410,27 +413,23 @@ def get_feature_importance(model_info):
 
 
 # =========================================================
-# SIDEBAR
+# DATA AUTOMATION (SIDEBAR)
 # =========================================================
 
 st.sidebar.markdown("## 📂 Dataset Control")
-uploaded_file = st.sidebar.file_uploader("Upload your cleaned CSV file", type=["csv"])
 
-if uploaded_file is not None:
-    raw_df = pd.read_csv(uploaded_file)
-    file_source = uploaded_file.name
-else:
-    raw_df, file_source = load_default_csv()
+# Automatically loads from local repo paths with compressed_data.csv.gz prioritized
+raw_df, file_source = load_default_csv()
 
 if raw_df is None:
-    st.error("Please upload your cleaned CSV file named clean_global_market_ai_dataset_for_ml.csv")
+    st.error("Critical Error: 'compressed_data.csv.gz' was not found in the root repository folder.")
     st.stop()
 
 df = prepare_dataset(raw_df)
 model_info = train_ml_model(df)
 
-st.sidebar.success("Dataset loaded successfully")
-st.sidebar.write("**File:**", file_source)
+st.sidebar.success("Dataset loaded automatically!")
+st.sidebar.write("**File Source:**", file_source)
 st.sidebar.write("**Rows:**", df.shape[0])
 st.sidebar.write("**Columns:**", df.shape[1])
 st.sidebar.write("**Model Accuracy:**", f"{model_info['accuracy'] * 100:.2f}%")
