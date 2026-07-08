@@ -295,24 +295,32 @@ def train_ml_model(data):
     df = data.copy()
     target = "AI_Investment_Decision"
 
-    # CRITICAL LEAKAGE REMOVAL: 
-    # To fix the 100% artificial accuracy issue, drop the exact rules used to generate the label
-    leakage_columns = ["Expected_Return", "Risk_Level", "Technical_Signal", "News_Sentiment"]
+    # 1. Separate the classes to handle the 81.5% imbalance
+    df_avoid = df[df[target] == "Avoid"]
+    df_monitor = df[df[target] == "Monitor"]
+    df_invest = df[df[target] == "Invest"]
     
-    metadata_columns = [
-        target,
-        "Investment_Recommendation",
-        "Record_ID",
-        "Date",
-        "AI_Model_Version"
-    ]
+    # Downsample 'Avoid' and 'Monitor' to match the size of 'Invest' (approx 2,800 rows each)
+    sample_size = len(df_invest)
+    
+    df_avoid_downsampled = df_avoid.sample(n=sample_size, random_state=42)
+    df_monitor_downsampled = df_monitor.sample(n=sample_size, random_state=42)
+    
+    # Recombine into a perfectly balanced training dataset
+    df_balanced = pd.concat([df_invest, df_monitor_downsampled, df_avoid_downsampled])
+    # Shuffle the dataset
+    df_balanced = df_balanced.sample(frac=1, random_state=42).reset_index(drop=True)
 
+    # 2. DROP LEAKAGE COLUMNS (Crucial for fixing fake 100% accuracy)
+    leakage_columns = ["Expected_Return", "Risk_Level", "Technical_Signal", "News_Sentiment"]
+    metadata_columns = [target, "Investment_Recommendation", "Record_ID", "Date", "AI_Model_Version"]
     drop_columns = list(set(leakage_columns + metadata_columns))
-    drop_columns = [col for col in drop_columns if col in df.columns]
+    drop_columns = [col for col in drop_columns if col in df_balanced.columns]
 
-    X = df.drop(columns=drop_columns)
-    y = df[target]
+    X = df_balanced.drop(columns=drop_columns)
+    y = df_balanced[target]
 
+    # 3. Setup standard preprocessors
     categorical_columns = X.select_dtypes(include=["object", "category"]).columns.tolist()
     numeric_columns = X.select_dtypes(exclude=["object", "category"]).columns.tolist()
 
@@ -333,10 +341,9 @@ def train_ml_model(data):
         ]
     )
 
-    stratify_value = y if y.value_counts().min() >= 2 else None
-
+    # 4. Train on the perfectly balanced subset
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=stratify_value
+        X, y, test_size=0.2, random_state=42, stratify=y
     )
 
     model = Pipeline(steps=[
@@ -344,7 +351,6 @@ def train_ml_model(data):
         ("classifier", RandomForestClassifier(
             n_estimators=150,
             random_state=42,
-            class_weight="balanced",
             n_jobs=-1
         ))
     ])
